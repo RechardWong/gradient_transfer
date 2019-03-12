@@ -24,9 +24,9 @@ np.random.seed(21)  # numpy
 random.seed(21)  # random and transforms
 torch.backends.cudnn.deterministic = True  # cudnn
 
-margin = 1
+
 batch_size = 128
-epochs_B = 30
+epochs_B = 40
 epochs_S = 10 * epochs_B
 log_interval = 100
 train_GAN_epoch = 8  # 8
@@ -39,6 +39,7 @@ learning_rate = 1e-3
 
 top_layer_name = "fc2"
 layer_size = (256, 16)
+
 
 plt_train_loss = []
 plt_val_loss = []
@@ -215,8 +216,10 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
         total_loss_B = 0.0
         total_loss_S = 0.0
         batch_num_S = len(train_loader_S)
+        # for idx_B in range(len(train_loader_B)):
         for idx_B, (data_B, _) in enumerate(train_loader_B):
-            total_loss_B += train_one_batch(triplet_net_B, data_B, optim_B, triplet_loss)
+            if meta_train:
+                total_loss_B += train_one_batch(triplet_net_B, data_B, optim_B, triplet_loss)
 
             # train small data model one epoch
             if idx_B % batch_num_S == 0:

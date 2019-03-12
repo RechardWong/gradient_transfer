@@ -49,7 +49,7 @@ class TripletMNIST(Dataset):
             self.triplets.append([i, positive_index, negative_index])
         # self.test_triplets = triplets
 
-        # for small data
+        # for small data: targets_to_indices changed to small data indices.
         if samples_per_class is not None:
             self.targets_to_indices = {target: random_state.choice(self.targets_to_indices[target],
                                                                    samples_per_class)

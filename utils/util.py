@@ -7,12 +7,12 @@ Time: 20:23
 """
 import json
 import time
+from datetime import datetime
 from matplotlib import pyplot as plt
-
-save_path = './results/' + time.strftime("%Y-%m-%d-%H-%M", time.localtime()) + '--'
 
 
 def save_loss(file_name, loss_dict):
+    save_path = './results/' + datetime.now().strftime("%Y-%m-%d-%H-%M") + '--'
     with open(save_path + file_name, 'w') as f:
         json.dump(loss_dict, f)
 
@@ -39,6 +39,6 @@ def plot_loss(meta_loss_file, no_meta_loss_file):
 
 
 if __name__ == "__main__":
-    meta_loss_file = "../results/2019-03-12-08-49--meta_loss.json"
+    meta_loss_file = "../results/2019-03-12-18-06--meta_loss.json"
     no_meta_loss_file = "../results/2019-03-12-08-48--no_meta_loss.json"
     plot_loss(meta_loss_file, no_meta_loss_file)

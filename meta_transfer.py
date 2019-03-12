@@ -24,9 +24,8 @@ np.random.seed(21)  # numpy
 random.seed(21)  # random and transforms
 torch.backends.cudnn.deterministic = True  # cudnn
 
-margin = 1
 batch_size = 128
-epochs_B = 30
+epochs_B = 20
 epochs_S = 10 * epochs_B
 log_interval = 100
 train_GAN_epoch = 8  # 8
@@ -36,9 +35,12 @@ invert_rate = 0.1
 transfer_layer_name = "fc2"
 samples_per_class = 600
 learning_rate = 1e-3
+meta_alpha = 1e-4
+meta_beta = 5e-3
 
 top_layer_name = "fc2"
 layer_size = (256, 16)
+meta_train = True
 
 plt_train_loss = []
 plt_val_loss = []
@@ -76,7 +78,7 @@ triplet_net_Assist = TripletNet(MLP_Embedding()).to(device)
 netG = Generator(layer_size).to(device)
 netD = Discriminator(layer_size).to(device)
 
-meta = MetaLearner(triplet_net_S, triplet_net_Assist, triplet_loss, device, meta_alpha=1e-4, meta_beta=1e-3)
+meta = MetaLearner(triplet_net_S, triplet_net_Assist, triplet_loss, device, meta_alpha=meta_alpha, meta_beta=meta_beta)
 
 optim_B = optim.SGD(triplet_net_B.parameters(), lr=learning_rate)
 optim_S = optim.SGD(triplet_net_S.parameters(), lr=learning_rate)
@@ -179,7 +181,7 @@ def get_params(model, lay_name='fc2'):
     return params
 
 
-def plot_loss():
+def plot_loss(meta_plot=True):
     no_meta_train_loss, no_meta_val_loss = util.load_loss('./results/2019-03-12-08-48--no_meta_loss.json')
 
     f, (ax1, ax2) = plt.subplots(1, 2)
@@ -194,7 +196,8 @@ def plot_loss():
     plt.show()
 
     save_loss_dict = {'train': plt_train_loss, 'val': plt_val_loss}
-    util.save_loss('meta_loss.json', save_loss_dict)
+    save_name = 'meta_loss.json' if meta_plot else "no_meta_loss.json"
+    util.save_loss(save_name, save_loss_dict)
 
 
 def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
@@ -216,7 +219,8 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
         total_loss_S = 0.0
         batch_num_S = len(train_loader_S)
         for idx_B, (data_B, _) in enumerate(train_loader_B):
-            total_loss_B += train_one_batch(triplet_net_B, data_B, optim_B, triplet_loss)
+            if meta_train:
+                total_loss_B += train_one_batch(triplet_net_B, data_B, optim_B, triplet_loss)
 
             # train small data model one epoch
             if idx_B % batch_num_S == 0:
@@ -240,12 +244,11 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
         template = '[Big   Dataset {:3}/{:3}] Train loss: {:.4f} Val loss: {:.4f}'
         print(template.format(epoch_B + 1, epochs_B, train_loss_B, val_loss_B))
 
+    if not meta_train:
+        return None
     print("start train  GAN...")
     dif_params_B, dif_params_S = torch.stack(dif_params_B), torch.stack(dif_params_S)
     print("GAN train size ", dif_params_B.size())
-
-    if not meta_train:
-        return None
 
     GAN_dataset = TensorDataset(dif_params_B, dif_params_S)
     GAN_loader = DataLoader(GAN_dataset, batch_size=GAN_batch_size)
@@ -301,5 +304,5 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
 
 
 if __name__ == "__main__":
-    trainer(triplet_net_S, triplet_net_B, train_GAN_epoch=train_GAN_epoch, meta_train=True)
-    plot_loss()
+    trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train)
+    plot_loss(meta_train)

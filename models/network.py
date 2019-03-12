@@ -179,9 +179,7 @@ class MetaLearner(nn.Module):
         # print("sss", s_grads)
         for i, (name, grad) in enumerate(b_grads):
             if top_layer_name in name and "weight" in name:
-                # print(b_grads[i][1].size(),g_B2S.size())
                 b_grads[i] = (name, grad_B2S.clone())
-        # print("bbb", b_grads)
 
         # theta1:(theta - delta theta) 2:(theta - delta theta)
         theta_small_state_dict = copy.deepcopy(self.learner.state_dict())
@@ -198,7 +196,6 @@ class MetaLearner(nn.Module):
         loss_outputs = self.criterion(*assist_out)
         loss_1 = loss_outputs.item()
         loss_outputs.backward()
-
         # get grad
         grad_1 = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
 
@@ -210,8 +207,7 @@ class MetaLearner(nn.Module):
         loss_outputs.backward()
         # get grad
         grad_2 = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
-        # print("grad_1", grad_1[0][1].size())
-        # print("grad_2", grad_2[0][1].size())
+
         # print("before", self.learner.state_dict())
         for i, (name, grad) in enumerate(grad_2):
             self.learner.state_dict()[name] -= (self.meta_beta * (grad + grad_1[i][1]) / 2)
