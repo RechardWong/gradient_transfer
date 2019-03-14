@@ -147,19 +147,19 @@ class LinearRegression(nn.Module):
 
 
 class MetaLearner(nn.Module):
-    def __init__(self, learner, assistLearner, criterion, device, meta_alpha=1e-4, meta_beta=5e-3):
+    def __init__(self, learner, assist_learner, criterion, device, meta_alpha=1e-4, meta_beta=5e-3):
         super(MetaLearner, self).__init__()
         self.learner = learner
-        self.assistLearner = assistLearner
+        self.assist_learner = assist_learner
         self.criterion = criterion
         self.device = device
         self.meta_alpha = meta_alpha
         self.meta_beta = meta_beta
-        self.optim_a = optim.Adam(self.assistLearner.parameters(), lr=1e-3)
+        self.optim_a = optim.Adam(self.assist_learner.parameters(), lr=1e-3)
 
     def forward(self, para_map, support_set, query_set):
-        self.assistLearner.train()
-        self.assistLearner.load_state_dict(copy.deepcopy(self.learner.state_dict()))
+        self.assist_learner.train()
+        self.assist_learner.load_state_dict(copy.deepcopy(self.learner.state_dict()))
 
         data = tuple(d.to(self.device) for d in support_set)
         query = tuple(d.to(self.device) for d in query_set)
@@ -169,13 +169,13 @@ class MetaLearner(nn.Module):
         # print("g_B2S",g_B2S)
 
         self.optim_a.zero_grad()
-        assist_out = self.assistLearner(*data)
+        assist_out = self.assist_learner(*data)
         loss_outputs = self.criterion(*assist_out)
         loss_0 = loss_outputs.item()
         loss_outputs.backward()
 
-        s_grads = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
-        b_grads = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
+        s_grads = [(name, param.grad.clone()) for name, param in self.assist_learner.named_parameters()]
+        b_grads = [(name, param.grad.clone()) for name, param in self.assist_learner.named_parameters()]
         # print("sss", s_grads)
         for i, (name, grad) in enumerate(b_grads):
             if top_layer_name in name and "weight" in name:
@@ -190,27 +190,40 @@ class MetaLearner(nn.Module):
         for (name, grad) in b_grads:
             theta_big_state_dict[name] -= self.meta_alpha * grad
 
-        self.assistLearner.train()
-        self.assistLearner.load_state_dict(theta_small_state_dict)
-        assist_out = self.assistLearner(*query)
-        loss_outputs = self.criterion(*assist_out)
-        loss_1 = loss_outputs.item()
-        loss_outputs.backward()
-        # get grad
-        grad_1 = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
+        self.assist_learner.train()
+        self.assist_learner.load_state_dict(theta_small_state_dict)
 
-        self.assistLearner.train()
-        self.assistLearner.load_state_dict(theta_big_state_dict)
-        assist_out = self.assistLearner(*query)
+        self.optim_a.zero_grad()
+        assist_out = self.assist_learner(*query)
         loss_outputs = self.criterion(*assist_out)
-        loss_2 = loss_outputs.item()
+        loss_s = loss_outputs.item()
         loss_outputs.backward()
         # get grad
-        grad_2 = [(name, param.grad.clone()) for name, param in self.assistLearner.named_parameters()]
+        grad_s = [(name, param.grad.clone()) for name, param in self.assist_learner.named_parameters()]
+
+        self.assist_learner.train()
+        self.assist_learner.load_state_dict(theta_big_state_dict)
+
+        self.optim_a.zero_grad()
+        assist_out = self.assist_learner(*query)
+        loss_outputs = self.criterion(*assist_out)
+        loss_b = loss_outputs.item()
+        loss_outputs.backward()
+        # get grad
+        grad_b = [(name, param.grad.clone()) for name, param in self.assist_learner.named_parameters()]
 
         # print("before", self.learner.state_dict())
-        for i, (name, grad) in enumerate(grad_2):
-            self.learner.state_dict()[name] -= (self.meta_beta * (grad + grad_1[i][1]) / 2)
+        for i, (name, grad) in enumerate(grad_b):
+            self.learner.state_dict()[name] -= (self.meta_beta * (grad + grad_s[i][1]) / 2)
+            # only big grad
+            # self.learner.state_dict()[name] -= (self.meta_beta * grad)
+
+            # only small grad
+            # self.learner.state_dict()[name] -= (self.meta_beta * grad_s[i][1])
+
+        # only small first order grad
+        # self.learner.load_state_dict(theta_small_state_dict)
+
         # print("after",self.learner.state_dict())
         # query_loss = (loss_2+loss_1)/2
         query_loss = loss_0

@@ -23,16 +23,13 @@ def load_loss(file_name):
         return loss["train"], loss["val"]
 
 
-def plot_loss(meta_loss_file, no_meta_loss_file):
-    meta_train_loss, meta_val_loss = load_loss(meta_loss_file)
-    no_meta_train_loss, no_meta_val_loss = load_loss(no_meta_loss_file)
+def plot_loss(loss_files):
+    colors = ['r', 'b', 'g', 'y', 'k', 'm', 'w', 'c']
     f, (ax1, ax2) = plt.subplots(1, 2)
-
-    ax1.plot(meta_train_loss, c="r")
-    ax2.plot(meta_val_loss, c="r")
-
-    ax1.plot(no_meta_train_loss, c="b")
-    ax2.plot(no_meta_val_loss, c="b")
+    for idx, loss_file in enumerate(loss_files):
+        train_loss, val_loss = load_loss(loss_file)
+        ax1.plot(train_loss, c=colors[idx])
+        ax2.plot(val_loss, c=colors[idx])
     ax1.set_title('Train loss')
     ax2.set_title('Val  loss')
     plt.show()
@@ -41,4 +38,8 @@ def plot_loss(meta_loss_file, no_meta_loss_file):
 if __name__ == "__main__":
     meta_loss_file = "../results/2019-03-12-18-06--meta_loss.json"
     no_meta_loss_file = "../results/2019-03-12-08-48--no_meta_loss.json"
-    plot_loss(meta_loss_file, no_meta_loss_file)
+    no_GAN_meta_loss_file = '../results/2019-03-13-18-20--meta_loss_no_GAN.json'
+    # first_order_small_loss = '../results/2019-03-13-17-13--only_small_first_order_grad_meta_loss.json'
+    only_small_grad_meta1 = '../results/2019-03-13-21-34--with_clear_grad_no_GAN.json'
+    only_small_grad_meta2 = '../results/2019-03-14-01-18--with_clear_grad_no_GAN.json'
+    plot_loss((only_small_grad_meta1, only_small_grad_meta2))

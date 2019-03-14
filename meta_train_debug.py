@@ -24,22 +24,22 @@ np.random.seed(21)  # numpy
 random.seed(21)  # random and transforms
 torch.backends.cudnn.deterministic = True  # cudnn
 
-
 batch_size = 128
-epochs_B = 40
+epochs_B = 20
 epochs_S = 10 * epochs_B
-log_interval = 100
-train_GAN_epoch = 8  # 8
+mid_epoch = 8  # 8
 epochs_GAN = 200  # 200
 GAN_batch_size = 4
 invert_rate = 0.1
-transfer_layer_name = "fc2"
 samples_per_class = 600
 learning_rate = 1e-3
+meta_alpha = 1e-4
+meta_beta = 5e-3
 
 top_layer_name = "fc2"
 layer_size = (256, 16)
-
+meta_train = True
+is_train_GAN = False
 
 plt_train_loss = []
 plt_val_loss = []
@@ -67,8 +67,6 @@ train_loader_S = DataLoader(mini_triplet_train_dataset, batch_size=batch_size, s
 test_loader_S = DataLoader(mini_triplet_test_dataset, batch_size=batch_size, shuffle=False, **kwargs)
 train_loader_S_query = DataLoader(mini_triplet_train_dataset, batch_size=batch_size, shuffle=False, **kwargs)
 
-# train_loader_S_list = list(enumerate(train_loader_S))
-
 triplet_loss = nn.TripletMarginLoss()
 
 triplet_net_B = TripletNet(MLP_Embedding()).to(device)
@@ -77,7 +75,7 @@ triplet_net_Assist = TripletNet(MLP_Embedding()).to(device)
 netG = Generator(layer_size).to(device)
 netD = Discriminator(layer_size).to(device)
 
-meta = MetaLearner(triplet_net_S, triplet_net_Assist, triplet_loss, device, meta_alpha=1e-4, meta_beta=1e-3)
+meta = MetaLearner(triplet_net_S, triplet_net_Assist, triplet_loss, device, meta_alpha=meta_alpha, meta_beta=meta_beta)
 
 optim_B = optim.SGD(triplet_net_B.parameters(), lr=learning_rate)
 optim_S = optim.SGD(triplet_net_S.parameters(), lr=learning_rate)
@@ -180,9 +178,8 @@ def get_params(model, lay_name='fc2'):
     return params
 
 
-def plot_loss():
-    no_meta_train_loss, no_meta_val_loss = util.load_loss('./results/2019-03-12-08-48--no_meta_loss.json')
-
+def plot_save_loss(compare_file, save_name):
+    no_meta_train_loss, no_meta_val_loss = util.load_loss(compare_file)
     f, (ax1, ax2) = plt.subplots(1, 2)
 
     ax1.plot(plt_train_loss, c="r")
@@ -195,10 +192,10 @@ def plot_loss():
     plt.show()
 
     save_loss_dict = {'train': plt_train_loss, 'val': plt_val_loss}
-    util.save_loss('no_meta_loss.json', save_loss_dict)
+    util.save_loss(save_name, save_loss_dict)
 
 
-def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
+def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
     print("start training...")
     print("len(train_loader_B)={}, len(train_loader_S)={}.".format(len(train_loader_B), len(train_loader_S)))
 
@@ -210,13 +207,12 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
     params_S1 = get_params(triplet_net_S).clone()
 
     if not meta_train:
-        train_GAN_epoch = epochs_B
+        mid_epoch = epochs_B
 
-    for epoch_B in range(train_GAN_epoch):
+    batch_num_S = len(train_loader_S)
+    for epoch_B in range(mid_epoch):
         total_loss_B = 0.0
-        total_loss_S = 0.0
-        batch_num_S = len(train_loader_S)
-        # for idx_B in range(len(train_loader_B)):
+
         for idx_B, (data_B, _) in enumerate(train_loader_B):
             if meta_train:
                 total_loss_B += train_one_batch(triplet_net_B, data_B, optim_B, triplet_loss)
@@ -243,20 +239,20 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
         template = '[Big   Dataset {:3}/{:3}] Train loss: {:.4f} Val loss: {:.4f}'
         print(template.format(epoch_B + 1, epochs_B, train_loss_B, val_loss_B))
 
-    print("start train  GAN...")
-    dif_params_B, dif_params_S = torch.stack(dif_params_B), torch.stack(dif_params_S)
-    print("GAN train size ", dif_params_B.size())
-
     if not meta_train:
         return None
 
-    GAN_dataset = TensorDataset(dif_params_B, dif_params_S)
-    GAN_loader = DataLoader(GAN_dataset, batch_size=GAN_batch_size)
-    GAN_criterion = torch.nn.BCELoss()
-    train_GAN(netG, netD, GAN_loader, optim_G, optim_D, GAN_criterion, epochs_GAN)
+    if is_train_GAN:
+        print("start train  GAN...")
+        dif_params_B, dif_params_S = torch.stack(dif_params_B), torch.stack(dif_params_S)
+        print("GAN train size ", dif_params_B.size())
 
-    batch_num_S = len(train_loader_S)
-    for epoch_B in range(train_GAN_epoch, epochs_B):
+        GAN_dataset = TensorDataset(dif_params_B, dif_params_S)
+        GAN_loader = DataLoader(GAN_dataset, batch_size=GAN_batch_size)
+        GAN_criterion = torch.nn.BCELoss()
+        train_GAN(netG, netD, GAN_loader, optim_G, optim_D, GAN_criterion, epochs_GAN)
+
+    for epoch_B in range(mid_epoch, epochs_B):
         total_loss_B = 0.0
         total_loss_S = 0.0
         for idx_B, (data_B, _) in enumerate(train_loader_B):
@@ -269,23 +265,27 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
             _, (query_data, _) = query_data_list[idx_B % batch_num_S]
 
             # 原来是所有 'fc' 层？
-            params_B = get_params(triplet_net_B)
-            # params_B.size(): torch.Size([16, 256])
-            grad_B = params_B.grad.clone()
-            netG.eval()
-            x, y = grad_B.size()
-            grad_B2S = netG(grad_B.unsqueeze(0))
-            grad_B2S = grad_B2S.data.view(x, y)
+            params_B = get_params(triplet_net_B)    # params_B.size(): torch.Size([16, 256])
+
+            grad_B2S = grad_B = params_B.grad.clone()
+            if is_train_GAN:
+                netG.eval()
+                x, y = grad_B.size()
+                grad_B2S = netG(grad_B.unsqueeze(0))
+                grad_B2S = grad_B2S.data.view(x, y)
             para_map = dict()
             para_map[top_layer_name] = grad_B2S
+            optim_S.zero_grad()
             loss = meta(para_map, support_data, query_data)
             total_loss_S += loss
+
+            # small data finished one epoch
             if idx_B % batch_num_S == batch_num_S - 1 or idx_B == len(train_loader_B) - 1:
                 batch_loss_num = (idx_B % batch_num_S) + 1
                 meta_loss_S = total_loss_S / batch_loss_num
                 total_loss_S = 0.0
                 val_loss_S = val(triplet_net_S, test_loader_S, triplet_loss)
-                # train_loss_S = val(triplet_net_S, train_loader_S, triplet_loss)
+                train_loss_S = val(triplet_net_S, train_loader_S, triplet_loss)
                 plt_train_loss.append(train_loss_S)
                 plt_val_loss.append(val_loss_S)
 
@@ -297,6 +297,7 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
 
                 epoch_S += 1
 
+        # big data finished one epoch
         train_loss_B = total_loss_B / len(train_loader_B)
         val_loss_B = val(triplet_net_B, test_loader_B, triplet_loss)
         template = "[Big   Dataset {:3}/{:3}] Train loss: {:.4f} Val loss: {:.4f}"
@@ -304,5 +305,6 @@ def trainer(triplet_net_S, triplet_net_B, train_GAN_epoch, meta_train=True):
 
 
 if __name__ == "__main__":
-    trainer(triplet_net_S, triplet_net_B, train_GAN_epoch=train_GAN_epoch, meta_train=False)
-    plot_loss()
+    trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train)
+    compare_file = './results/2019-03-14-01-18--with_clear_grad_no_GAN.json'
+    plot_save_loss(compare_file, save_name='meta_no_GAN.json')
