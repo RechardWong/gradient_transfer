@@ -212,12 +212,17 @@ class MetaLearner(nn.Module):
         # get grad
         grad_b = [(name, param.grad.clone()) for name, param in self.assist_learner.named_parameters()]
 
+        # diff_grad_sum = sum(torch.sum(torch.abs(grad - grad_s[i][1])) for i, (name, grad) in enumerate(grad_b))
+        # print("diff between grad_s and grad_b: %4.f" % diff_grad_sum)
+
         # print("before", self.learner.state_dict())
         for i, (name, grad) in enumerate(grad_b):
+            # meta learn
             self.learner.state_dict()[name] -= (self.meta_beta * (grad + grad_s[i][1]) / 2)
+
             # only big grad
             # self.learner.state_dict()[name] -= (self.meta_beta * grad)
-
+            
             # only small grad
             # self.learner.state_dict()[name] -= (self.meta_beta * grad_s[i][1])
 

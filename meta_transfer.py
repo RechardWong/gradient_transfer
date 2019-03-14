@@ -252,6 +252,7 @@ def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
         GAN_criterion = torch.nn.BCELoss()
         train_GAN(netG, netD, GAN_loader, optim_G, optim_D, GAN_criterion, epochs_GAN)
 
+    print("start meta training...")
     for epoch_B in range(mid_epoch, epochs_B):
         total_loss_B = 0.0
         total_loss_S = 0.0
@@ -265,7 +266,7 @@ def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
             _, (query_data, _) = query_data_list[idx_B % batch_num_S]
 
             # 原来是所有 'fc' 层？
-            params_B = get_params(triplet_net_B)    # params_B.size(): torch.Size([16, 256])
+            params_B = get_params(triplet_net_B)  # params_B.size(): torch.Size([16, 256])
 
             grad_B2S = grad_B = params_B.grad.clone()
             if is_train_GAN:
@@ -307,5 +308,5 @@ def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
 
 if __name__ == "__main__":
     trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train)
-    compare_file = './results/2019-03-14-10-45--with_clear_only_small_grad.json'
-    plot_save_loss(compare_file, save_name='only_small_grad.json')
+    compare_file = './results/2019-03-14-11-20--no_meta_benchmark.json'
+    plot_save_loss(compare_file, save_name='meta_no_GAN_alpha.json')

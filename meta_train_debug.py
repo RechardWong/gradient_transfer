@@ -33,13 +33,19 @@ GAN_batch_size = 4
 invert_rate = 0.1
 samples_per_class = 600
 learning_rate = 1e-3
-meta_alpha = 1e-4
+meta_alpha = 0.1
 meta_beta = 5e-3
 
 top_layer_name = "fc2"
 layer_size = (256, 16)
 meta_train = True
 is_train_GAN = False
+is_debug = False
+
+if is_debug:
+    epochs_B = 2
+    epochs_S = 10 * epochs_B
+    mid_epoch = 1  # 8
 
 plt_train_loss = []
 plt_val_loss = []
@@ -265,7 +271,7 @@ def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
             _, (query_data, _) = query_data_list[idx_B % batch_num_S]
 
             # 原来是所有 'fc' 层？
-            params_B = get_params(triplet_net_B)    # params_B.size(): torch.Size([16, 256])
+            params_B = get_params(triplet_net_B)  # params_B.size(): torch.Size([16, 256])
 
             grad_B2S = grad_B = params_B.grad.clone()
             if is_train_GAN:
@@ -306,5 +312,5 @@ def trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train=True):
 
 if __name__ == "__main__":
     trainer(triplet_net_S, triplet_net_B, mid_epoch, meta_train)
-    compare_file = './results/2019-03-14-01-18--with_clear_grad_no_GAN.json'
-    plot_save_loss(compare_file, save_name='meta_no_GAN.json')
+    compare_file = './results/2019-03-14-11-20--no_meta_benchmark.json'
+    plot_save_loss(compare_file, save_name='only_small_grad.json')

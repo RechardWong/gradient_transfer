@@ -24,7 +24,7 @@ def load_loss(file_name):
 
 
 def plot_loss(loss_files):
-    colors = ['r', 'b', 'g', 'y', 'k', 'm', 'w', 'c']
+    colors = ['b', 'r', 'g', 'y', 'c', 'm', 'k', 'w']
     f, (ax1, ax2) = plt.subplots(1, 2)
     for idx, loss_file in enumerate(loss_files):
         train_loss, val_loss = load_loss(loss_file)
@@ -36,10 +36,11 @@ def plot_loss(loss_files):
 
 
 if __name__ == "__main__":
-    meta_loss_file = "../results/2019-03-12-18-06--meta_loss.json"
-    no_meta_loss_file = "../results/2019-03-12-08-48--no_meta_loss.json"
-    no_GAN_meta_loss_file = '../results/2019-03-13-18-20--meta_loss_no_GAN.json'
-    # first_order_small_loss = '../results/2019-03-13-17-13--only_small_first_order_grad_meta_loss.json'
-    only_small_grad_meta1 = '../results/2019-03-13-21-34--with_clear_grad_no_GAN.json'
-    only_small_grad_meta2 = '../results/2019-03-14-01-18--with_clear_grad_no_GAN.json'
-    plot_loss((only_small_grad_meta1, only_small_grad_meta2))
+    no_meta_benchmark = "../results/2019-03-14-11-20--no_meta_benchmark.json"
+    meta_learn = "../results/2019-03-14-13-10--meta_learn.json"
+    meta_no_GAN = '../results/2019-03-14-12-15--meta_no_GAN.json'
+    only_small_grad = '../results/2019-03-14-12-12--only_small_grad.json'
+    only_big_grad = '../results/2019-03-14-13-08--only_big_grad.json'
+    # first_order_small_loss = '../results/'
+    # plot_loss((no_meta_benchmark, meta_learn, meta_no_GAN, only_small_grad, only_big_grad))
+    plot_loss((meta_no_GAN, only_small_grad, only_big_grad))
